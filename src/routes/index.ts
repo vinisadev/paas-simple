@@ -1,47 +1,10 @@
-import express, { Router, Request, Response } from 'express';
-import { Role } from '@prisma/client';
+import { Router } from 'express';
 import { authRoutes } from './auth.routes';
-import { authenticateToken, requireRole } from '../middleware/auth.middleware';
+import { containerRoutes } from './container.routes';
 
 const router = Router();
 
-// Auth routes
 router.use('/auth', authRoutes);
-
-// Protected routes with different role requirements
-router.get(
-  '/protected',
-  authenticateToken,
-  (req: Request, res: Response): void => {
-    res.json({
-      message: 'This is a protected route',
-      user: req.user
-    });
-  }
-);
-
-router.get(
-  '/admin',
-  authenticateToken,
-  requireRole([Role.ADMIN]),
-  (req: Request, res: Response): void => {
-    res.json({
-      message: 'Welcome to the admin panel',
-      user: req.user
-    });
-  }
-);
-
-router.get(
-  '/developer',
-  authenticateToken,
-  requireRole([Role.DEVELOPER, Role.ADMIN]),
-  (req: Request, res: Response): void => {
-    res.json({
-      message: 'Welcome to the developer console',
-      user: req.user
-    });
-  }
-);
+router.use('/containers', containerRoutes);
 
 export { router as routes };
