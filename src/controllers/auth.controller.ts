@@ -1,18 +1,25 @@
 import { Request, Response } from 'express';
+import { Role } from '@prisma/client';
 import { AuthService } from '../services/auth.service';
 import { registerSchema, loginSchema } from '../validators/auth.validator';
 
 const authService = new AuthService();
 
 export class AuthController {
-  async register(req: Request, res: Response) {
+  async register(req: Request, res: Response): Promise<void> {
     try {
-      const { email, password } = registerSchema.parse(req.body);
-      const user = await authService.register(email, password);
-
+      const { email, password, role } = registerSchema.parse(req.body);
+      
+      const user = await authService.register(email, password, role);
+      
       res.status(201).json({
         message: 'User registered successfully',
-        userId: user.id
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          createdAt: user.createdAt
+        }
       });
     } catch (error) {
       if (error instanceof Error) {
@@ -23,11 +30,11 @@ export class AuthController {
     }
   }
 
-  async login(req: Request, res: Response) {
+  async login(req: Request, res: Response): Promise<void> {
     try {
       const { email, password } = loginSchema.parse(req.body);
       const token = await authService.login(email, password);
-
+      
       res.json({
         message: 'Login successful',
         token

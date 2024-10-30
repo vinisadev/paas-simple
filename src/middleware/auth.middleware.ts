@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Role } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { authConfig } from '../config/auth.config';
 import { UserPayload } from '../types/auth.types';
@@ -33,6 +34,29 @@ export const authenticateToken = async (
     } else {
       res.status(403).json({ error: 'Invalid or expired token' });
     }
-    return;
   }
+};
+
+export const requireRole = (roles: Role[]) => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    if (!roles.includes(req.user.role)) {
+      res.status(403).json({ 
+        error: 'Insufficient permissions',
+        required: roles,
+        current: req.user.role
+      });
+      return;
+    }
+
+    next();
+  };
 };

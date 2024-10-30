@@ -1,27 +1,28 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { Role } from '@prisma/client';
 import { authConfig } from '../config/auth.config';
 import { UserPayload } from '../types/auth.types';
 import { prisma } from '../lib/prisma';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 export class AuthService {
-  async register(email: string, password: string) {
+  async register(email: string, password: string, role?: Role) {
     try {
-      // Hash password
       const hashedPassword = await bcrypt.hash(password, authConfig.saltRounds);
 
-      // Create new user
       const user = await prisma.user.create({
         data: {
           email,
           password: hashedPassword,
+          ...(role && { role }) // Only include role if it's provided
         },
       });
 
       return {
         id: user.id,
         email: user.email,
+        role: user.role,
         createdAt: user.createdAt,
       };
     } catch (error) {
@@ -35,7 +36,6 @@ export class AuthService {
   }
 
   async login(email: string, password: string): Promise<string> {
-    // Find user
     const user = await prisma.user.findUnique({
       where: { email },
     });
@@ -44,16 +44,15 @@ export class AuthService {
       throw new Error('Invalid credentials');
     }
 
-    // Verify password
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       throw new Error('Invalid credentials');
     }
 
-    // Generate JWT
     const payload: UserPayload = {
       id: user.id,
       email: user.email,
+      role: user.role,
     };
 
     return jwt.sign(payload, authConfig.jwtSecret, {
@@ -67,6 +66,7 @@ export class AuthService {
       select: {
         id: true,
         email: true,
+        role: true,
         createdAt: true,
         updatedAt: true,
       },
