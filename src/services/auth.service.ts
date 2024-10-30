@@ -1,36 +1,45 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authConfig } from '../config/auth.config';
-import { User, UserPayload } from '../types/auth.types';
+import { UserPayload } from '../types/auth.types';
+import { prisma } from '../lib/prisma';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 export class AuthService {
-  private users: User[] = []; // This will be replaced with a database later
+  async register(email: string, password: string) {
+    try {
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, authConfig.saltRounds);
 
-  async register(email: string, password: string): Promise<User> {
-    // Check if user already exists
-    if (this.users.find(u => u.email === email)) {
-      throw new Error('User already exists');
+      // Create new user
+      const user = await prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+        },
+      });
+
+      return {
+        id: user.id,
+        email: user.email,
+        createdAt: user.createdAt,
+      };
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new Error('Email already exists');
+        }
+      }
+      throw error;
     }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, authConfig.saltRounds);
-
-    // Create new user
-    const user: User = {
-      id: crypto.randomUUID(),
-      email,
-      password: hashedPassword,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.users.push(user);
-    return user;
   }
 
   async login(email: string, password: string): Promise<string> {
     // Find user
-    const user = this.users.find(u => u.email === email);
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
     if (!user) {
       throw new Error('Invalid credentials');
     }
@@ -44,11 +53,29 @@ export class AuthService {
     // Generate JWT
     const payload: UserPayload = {
       id: user.id,
-      email: user.email
+      email: user.email,
     };
 
     return jwt.sign(payload, authConfig.jwtSecret, {
-      expiresIn: authConfig.jwtExpiresIn
+      expiresIn: authConfig.jwtExpiresIn,
     });
+  }
+
+  async getUserById(id: string) {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return user;
   }
 }

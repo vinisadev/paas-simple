@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { authConfig } from '../config/auth.config';
 import { UserPayload } from '../types/auth.types';
+import { AuthService } from '../services/auth.service';
+
+const authService = new AuthService();
 
 export const authenticateToken = async (
   req: Request,
@@ -18,10 +21,18 @@ export const authenticateToken = async (
     }
 
     const payload = jwt.verify(token, authConfig.jwtSecret) as UserPayload;
+    
+    // Verify user exists in database
+    await authService.getUserById(payload.id);
+    
     req.user = payload;
     next();
   } catch (error) {
-    res.status(403).json({ error: 'Invalid or expired token' });
+    if (error instanceof Error) {
+      res.status(403).json({ error: error.message });
+    } else {
+      res.status(403).json({ error: 'Invalid or expired token' });
+    }
     return;
   }
 };
